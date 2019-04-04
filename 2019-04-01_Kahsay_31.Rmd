@@ -1,0 +1,666 @@
+---
+title: "2019-04-01_Kahsay_31"
+author: "Nicolas May"
+date: "4/4/2019"
+output: 
+  html_document:
+    theme: sandstone
+    highlight: zenburn
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# BUILD DATASET
+
+## Load Requirements
+
+### Load Packages
+
+```{r}
+suppressMessages( library(dplyr)     )
+suppressMessages( library(readr)     )
+suppressMessages( library(stringr)   )
+suppressMessages( library(lubridate) )
+suppressMessages( library(tidyr)     )
+```
+
+### Load Useful Globals / Functions
+
+```{r}
+source("~/Desktop/config.R")
+source("~/Desktop/helpers.R")
+
+GET_API_DATA <- TRUE
+```
+
+
+## Get Data
+
+### Define Data Fields/Forms
+
+UDS 3
+
+```{r}
+# Form Header
+fields_u3_hd_vct <-
+  c(
+    "ptid"
+    , "dob"
+    , "form_date"
+  )
+
+# Form A1
+fields_u3_a1_vct <-
+  c(
+    "sex"        # 1 M, 2 F
+    , "race"     # 1 Wht, 2 Blk, 3 AmI, 4 NH, 5 Asn, 50 Oth, 99 Unk
+    , "handed"   # 1 L, 2 R, 3 A, 9 Unk
+    , "educ"     # 
+    , "maristat" # 
+  ) %>% 
+  c(., paste0("fu_", .), paste0("tele_", .))
+
+# Form B6
+fields_u3_b6_vct <- 
+  c(
+    "nogds"
+    , "satis"
+    , "dropact"
+    , "empty"
+    , "bored"
+    , "spirits"
+    , "afraid"
+    , "happy"
+    , "helpless"
+    , "stayhome"
+    , "memprob"
+    , "wondrful"
+    , "wrthless"
+    , "energy"
+    , "hopeless"
+    , "better"
+    , "gds"
+  ) %>% 
+  c(., paste0("fu_", .), paste0("tele_", .))
+
+# Form C2
+fields_u3_c2_vct <-
+  c(
+    "mocatots" # 1f. MOCA TOTAL RAW SCORE - UNCORRECTED
+  )
+
+# Form D1
+fields_u3_d1_vct <-
+  c(
+    # Normal cognition
+    "normcog"     # ivp_d1; 2. Does the subject have normal cognition?
+    # Dementia
+    , "demented"    # ivp_d1; 3. Does the subject meet criteria for dementia?
+    , "amndem"      # ivp_d1; 4a. Amnestic multidomain dementia syndrome
+    , "pca"         # ivp_d1; 4b. Posterior cortical atrophy syndrome
+    , "ppasyn"      # ivp_d1; 4c. Primary progressive aphasia (PPA) syndrome
+    , "ftdsyn"      # ivp_d1; 4d. Behavioral variant FTD syndrome
+    , "lbdsyn"      # ivp_d1; 4e. Lewy body dementia syndrome
+    , "namndem"     # ivp_d1; 4f. Non-amnestic multidomain dementia
+    , "mciamem"     # ivp_d1; 5a. Amnestic MCI, single domain (aMCI SD)
+    , "mciaplus"    # ivp_d1; 5b. Amnestic MCI, multiple domains (aMCI MD)
+    , "mcinon1"     # ivp_d1; 5c. Non-amnestic MCI, single domain (naMCI SD)
+    , "mcinon2"     # ivp_d1; 5d. Non-amnestic MCI, multiple domains (naMCI MD)
+    , "impnomci"    # ivp_d1; 5e. Cognitively impaired, not MCI
+    # Dementia etiology
+    , "alzdis"      # ivp_d1; 11. Alzheimer's disease
+    , "alzdisif"
+    , "lbdis"       # ivp_d1; 12. Lewy body disease
+    , "lbdif"
+    , "msa"         # ivp_d1; 13. Multiple system atrophy
+    , "msaif"
+    , "cvd"         # ivp_d1; 15. Vascular Brain injury
+    , "cvdif"
+    , "esstrem"     # ivp_d1; 16. Essential tremor
+    , "esstreif"
+    , "downs"       # ivp_d1; 17. Down syndrom
+    , "downsif"
+    , "hunt"        # ivp_d1; 18. Huntington's disease
+    , "huntif"
+    , "prion"       # ivp_d1; 19. Prion disease
+    , "prionif"
+    , "brninj"      # ivp_d1; 20. Traumatic brain injury
+    , "brninjif"
+    , "hyceph"      # ivp_d1; 21. Normal-pressure hydrocephalus
+    , "hycephif"
+    , "epilep"      # ivp_d1; 22. Epilepsy
+    , "epilepif"
+    , "neop"        # ivp_d1; 23. CNS neoplasm
+    , "neopif"
+    , "hiv"         # ivp_d1; 24. Human immunodeficiency virus
+    , "hivif"
+    , "othcog"      # ivp_d1; 25. Cognitive impairment due to other not listed
+    , "othcogif"
+    , "dep"         # ivp_d1; 26. Active depression
+    , "depif"
+    , "bipoldx"     # ivp_d1; 27. Bipolar disorder
+    , "bipoldif"
+    , "schizop"     # ivp_d1; 28. Schizophrenia or other psychosis
+    , "schizoif"
+    , "anxiet"      # ivp_d1; 29. Anxiety disorder
+    , "anxietif"
+    , "delir"       # ivp_d1; 30. Delirium
+    , "delirif"
+    , "ptsddx"      # ivp_d1; 31. Post-traumatic stress disorder (PTSD)
+    , "ptsddxif"
+    , "othpsy"      # ivp_d1; 32. Other psychiatric disease
+    , "othpsyif"
+    , "alcdem"      # ivp_d1; 33. Cognitive impairment due to alcohol abuse
+    , "alcdemif"
+    , "impsub"      # ivp_d1; 34. Cognitive imp. due to other substance abuse
+    , "impsubif"
+    , "dysill"      # ivp_d1; 35. Cognitive impairment due to systemic disease
+    , "dysillif"
+    , "meds"        # ivp_d1; 36. Cognitive impairment due to medications
+    , "medsif"
+    , "cogoth"      # ivp_d1; 37. Cognitive impairment NOS
+    , "cogothif"
+    , "cogoth2"     # ivp_d1; 38. Cognitive impairment NOS
+    , "cogoth2f"
+    , "cogoth3"     # ivp_d1; 39. Cognitive impairment NOS
+    , "cogoth3f"
+  )
+
+# Form iPad Tool Box
+fields_u3_ipadtb_vct <-
+  c(
+    # NIH Toolbox
+    "date"                     # admin date
+    # , "tb_cardsortrawscore"    # TB CardSort RawScore
+    # , "tb_flankerrawscore"     # TB Flanker RawScore
+    # , "tb_listsortrawscore"    # TB ListSort RawScore
+    # , "tb_oralrawscore"        # TB Oral RawScore
+    # , "tb_patternrawscore"     # TB Pattern RawScore
+    # , "tb_picseqrawscore"      # TB PicSeq RawScore
+    # , "tb_picvocabrawscore"    # TB PicVocab RawScore
+    # , "ipad_tool_box_complete" # TB complete?
+    , "tb_cardsortage_corrected_standard_score"
+    , "tb_cardsortcolumn1"
+    , "tb_cardsortcolumn2"
+    , "tb_cardsortcolumn3"
+    , "tb_cardsortcolumn4"
+    , "tb_cardsortcolumn5"
+    , "tb_cardsortcomputed_score"
+    , "tb_cardsortfully_corrected_t_score"
+    , "tb_cardsortinstrumentbreakoff"
+    , "tb_cardsortinstrumentrcreason"
+    , "tb_cardsortinstrumentrcreasonother"
+    , "tb_cardsortinstrumentstatus2"
+    , "tb_cardsortitmcnt"
+    , "tb_cardsortlanguage"
+    , "tb_cardsortnational_percentile_age_adjusted"
+    , "tb_cardsortrawscore"
+    , "tb_cardsortse"
+    , "tb_cardsorttheta"
+    , "tb_cardsorttscore"
+    , "tb_cardsortuncorrected_standard_score"
+    , "tb_flankerage_corrected_standard_score"
+    , "tb_flankercolumn1"
+    , "tb_flankercolumn2"
+    , "tb_flankercolumn3"
+    , "tb_flankercolumn4"
+    , "tb_flankercolumn5"
+    , "tb_flankercomputed_score"
+    , "tb_flankerfully_corrected_t_score"
+    , "tb_flankerinstrumentbreakoff"
+    , "tb_flankerinstrumentrcreason"
+    , "tb_flankerinstrumentrcreasonother"
+    , "tb_flankerinstrumentstatus2"
+    , "tb_flankeritmcnt"
+    , "tb_flankerlanguage"
+    , "tb_flankernational_percentile_age_adjusted"
+    , "tb_flankerrawscore"
+    , "tb_flankerse"
+    , "tb_flankertheta"
+    , "tb_flankertscore"
+    , "tb_flankeruncorrected_standard_score"
+    , "tb_listsortage_corrected_standard_score"
+    , "tb_listsortcolumn1"
+    , "tb_listsortcolumn2"
+    , "tb_listsortcolumn3"
+    , "tb_listsortcolumn4"
+    , "tb_listsortcolumn5"
+    , "tb_listsortcomputed_score"
+    , "tb_listsortfully_corrected_t_score"
+    , "tb_listsortinstrumentbreakoff"
+    , "tb_listsortinstrumentrcreason"
+    , "tb_listsortinstrumentrcreasonother"
+    , "tb_listsortinstrumentstatus2"
+    , "tb_listsortitmcnt"
+    , "tb_listsortlanguage"
+    , "tb_listsortnational_percentile_age_adjusted"
+    , "tb_listsortrawscore"
+    , "tb_listsortse"
+    , "tb_listsorttheta"
+    , "tb_listsorttscore"
+    , "tb_listsortuncorrected_standard_score"
+    , "tb_oralage_corrected_standard_score"
+    , "tb_oralcolumn1"
+    , "tb_oralcolumn2"
+    , "tb_oralcolumn3"
+    , "tb_oralcolumn4"
+    , "tb_oralcolumn5"
+    , "tb_oralcomputed_score"
+    , "tb_oralfully_corrected_t_score"
+    , "tb_oralinstrumentbreakoff"
+    , "tb_oralinstrumentrcreason"
+    , "tb_oralinstrumentrcreasonother"
+    , "tb_oralinstrumentstatus2"
+    , "tb_oralitmcnt"
+    , "tb_orallanguage"
+    , "tb_oralnational_percentile_age_adjusted"
+    , "tb_oralrawscore"
+    , "tb_oralse"
+    , "tb_oraltheta"
+    , "tb_oraltscore"
+    , "tb_oraluncorrected_standard_score"
+    , "tb_patternage_corrected_standard_score"
+    , "tb_patterncolumn1"
+    , "tb_patterncolumn2"
+    , "tb_patterncolumn3"
+    , "tb_patterncolumn4"
+    , "tb_patterncolumn5"
+    , "tb_patterncomputed_score"
+    , "tb_patternfully_corrected_t_score"
+    , "tb_patterninstrumentbreakoff"
+    , "tb_patterninstrumentrcreason"
+    , "tb_patterninstrumentrcreasonother"
+    , "tb_patterninstrumentstatus2"
+    , "tb_patternitmcnt"
+    , "tb_patternlanguage"
+    , "tb_patternnational_percentile_age_adjusted"
+    , "tb_patternrawscore"
+    , "tb_patternse"
+    , "tb_patterntheta"
+    , "tb_patterntscore"
+    , "tb_patternuncorrected_standard_score"
+    , "tb_picseqage_corrected_standard_score"
+    , "tb_picseqcolumn1"
+    , "tb_picseqcolumn2"
+    , "tb_picseqcolumn3"
+    , "tb_picseqcolumn4"
+    , "tb_picseqcolumn5"
+    , "tb_picseqcomputed_score"
+    , "tb_picseqfully_corrected_t_score"
+    , "tb_picseqinstrumentbreakoff"
+    , "tb_picseqinstrumentrcreason"
+    , "tb_picseqinstrumentrcreasonother"
+    , "tb_picseqinstrumentstatus2"
+    , "tb_picseqitmcnt"
+    , "tb_picseqlanguage"
+    , "tb_picseqnational_percentile_age_adjusted"
+    , "tb_picseqrawscore"
+    , "tb_picseqse"
+    , "tb_picseqtheta"
+    , "tb_picseqtscore"
+    , "tb_picsequncorrected_standard_score"
+    , "tb_picvocabage_corrected_standard_score"
+    , "tb_picvocabcolumn1"
+    , "tb_picvocabcolumn2"
+    , "tb_picvocabcolumn3"
+    , "tb_picvocabcolumn4"
+    , "tb_picvocabcolumn5"
+    , "tb_picvocabcomputed_score"
+    , "tb_picvocabfully_corrected_t_score"
+    , "tb_picvocabinstrumentbreakoff"
+    , "tb_picvocabinstrumentrcreason"
+    , "tb_picvocabinstrumentrcreasonother"
+    , "tb_picvocabinstrumentstatus2"
+    , "tb_picvocabitmcnt"
+    , "tb_picvocablanguage"
+    , "tb_picvocabnational_percentile_age_adjusted"
+    , "tb_picvocabrawscore"
+    , "tb_picvocabse"
+    , "tb_picvocabtheta"
+    , "tb_picvocabtscore"
+    , "tb_picvocabuncorrected_standard_score"
+  )
+
+# Concatenate field vectors
+fields_u3_vct <- 
+  c(
+    fields_u3_hd_vct
+    , fields_u3_a1_vct
+    , fields_u3_b6_vct
+    , fields_u3_c2_vct
+    , fields_u3_d1_vct
+    , fields_u3_ipadtb_vct
+  )
+
+# Collapse all fields
+fields_u3 <- fields_u3_vct %>% paste(collapse = ",")
+```
+
+MiNDSet Registry
+
+```{r}
+# Registration Form
+fields_ms_reg_vct <-
+  c(
+    "subject_id"
+  )
+
+fields_ms_dem_vct <-
+  c(
+    "county"
+    , "race_value"
+    , "ed_level"
+    , "handedness"
+  )
+
+# Medical Visit Form
+fields_ms_med_vct <-
+  c(
+    "exam_date"
+  )
+
+# Concatenate field vectors
+fields_ms_vct <-
+  c(
+    fields_ms_reg_vct
+    , fields_ms_dem_vct
+    , fields_ms_med_vct
+  )
+
+# Collapse all fields
+fields_ms <- fields_ms_vct %>% paste(collapse = ",")
+```
+
+### Retrieve Data via REDCap API
+
+UDS3
+
+MiNDSet Registry
+
+### Retrieve Data from NACC Download CSVs
+
+NACC Toolbox Data
+
+```{r}
+# Load `Assessment Data.csv`
+df_asmnt_data <-
+  read_csv("./NACC_iPad_data/Assessment Data.csv",
+           col_types = cols(.default       = col_character()
+                            , ADCID        = col_integer()
+                            , INSTORDR     = col_integer()
+                            , INSTSCTN     = col_integer()
+                            , ITMORDR      = col_integer()
+                            , SCORE        = col_number()
+                            , THETA        = col_number()
+                            , TSCORE       = col_number()
+                            , SE           = col_number()
+                            , RESPONSETIME = col_number()
+                            ## MIXED DATETIME FORMATS!
+                            ## YYYY-MM-DD
+                            # , DATECREATED	= col_datetime("%Y-%m-%d %H:%M:%S")
+                            # , INSTTARTED  = col_datetime("%Y-%m-%d %H:%M:%S")
+                            # , INSTENDED   = col_datetime("%Y-%m-%d %H:%M:%S")
+                            ## MM/DD/YYYY
+                            # , DATECREATED	= col_datetime("%m/%d/%Y %H:%M:%S")
+                            # , INSTTARTED  = col_datetime("%m/%d/%Y %H:%M:%S")
+                            # , INSTENDED   = col_datetime("%m/%d/%Y %H:%M:%S")
+           )) %>% 
+  get_nonempty_fields()
+
+# Split `df_asmnt_data` to correctly coerce datetime fields to datetime type
+df_asmnt_data_1 <- df_asmnt_data %>% 
+  filter(str_detect(DATECREATED, 
+                    "\\d{4}-\\d{1,2}-\\d{1,2} \\d{1,2}:\\d{2}:\\d{2}") &
+           str_detect(INSTTARTED,
+                      "\\d{4}-\\d{1,2}-\\d{1,2} \\d{1,2}:\\d{2}:\\d{2}") &
+           str_detect(INSTENDED,
+                      "\\d{4}-\\d{1,2}-\\d{1,2} \\d{1,2}:\\d{2}:\\d{2}")) %>%
+  mutate_at(vars(DATECREATED, INSTTARTED, INSTENDED),
+            ~ as.POSIXct(as_datetime(.x, format = "%Y-%m-%d %H:%M:%S")))
+
+df_asmnt_data_2 <- df_asmnt_data %>% 
+  filter(str_detect(DATECREATED, 
+                    "\\d{1,2}/\\d{1,2}/\\d{4} \\d{1,2}:\\d{2}"),
+         str_detect(INSTTARTED, 
+                    "\\d{1,2}/\\d{1,2}/\\d{4} \\d{1,2}:\\d{2}"),
+         str_detect(INSTENDED, 
+                    "\\d{1,2}/\\d{1,2}/\\d{4} \\d{1,2}:\\d{2}")) %>% 
+  mutate_at(vars(DATECREATED, INSTTARTED, INSTENDED),
+            ~ as.POSIXct(as_datetime(.x, format = "%m/%d/%Y %H:%M")))
+
+df_asmnt_data_3 <- df_asmnt_data %>% 
+  filter(is.na(DATECREATED) &
+           is.na(INSTTARTED) &
+           is.na(INSTENDED)) %>% 
+  mutate_at(vars(DATECREATED, INSTTARTED, INSTENDED),
+            ~ as.POSIXct(as_datetime(.x)))
+
+# Recombine split `df_asmnt_data`
+whole_split_diff <- nrow(df_asmnt_data) - sum(nrow(df_asmnt_data_1), 
+                                              nrow(df_asmnt_data_2),
+                                              nrow(df_asmnt_data_3))
+if (whole_split_diff != 0) {
+  stop("Some data in `df_asmnt_data` unaccounted for")
+}
+df_asmnt_data <- bind_rows(df_asmnt_data_1, 
+                           df_asmnt_data_2,
+                           df_asmnt_data_3)
+rm(df_asmnt_data_1); rm(df_asmnt_data_2); rm(df_asmnt_data_3);
+
+# Load `Assessment Scores.csv`
+df_asmnt_scrs <-
+  read_csv("./NACC_iPad_data/Assessment Scores.csv",
+           col_types = cols(.default   = col_character()
+                            , ADCID    = col_integer()
+                            , RAWSCORE = col_number()
+                            , THETA    = col_number()
+                            , TSCORE   = col_integer()
+                            , SE       = col_number()
+                            , ITMCNT   = col_integer()
+                            ## MIXED DATETIME FORMATS!
+                            ## YYYY-MM-DD
+                            # DATEFINISHED = col_datetime("%Y-%m-%d %H:%M:%S")
+                            ## MM/DD/YYYY
+                            # DATEFINISHED = col_datetime("%Y-%m-%d %H:%M:%S")
+           )) %>% 
+  get_nonempty_fields()
+
+# Split `df_asmnt_scrs` to correctly coerce datetime fields to datetime type
+df_asmnt_scrs_1 <- df_asmnt_scrs %>% 
+  filter(str_detect(DATEFINISHED,
+                    "\\d{4}-\\d{1,2}-\\d{1,2} \\d{1,2}:\\d{2}:\\d{2}")) %>% 
+  mutate_at(vars(DATEFINISHED),
+            ~ as.POSIXct(as_datetime(.x, format = "%Y-%m-%d %H:%M:%S")))
+
+df_asmnt_scrs_2 <- df_asmnt_scrs %>% 
+  filter(str_detect(DATEFINISHED,
+                    "\\d{1,2}/\\d{1,2}/\\d{4} \\d{1,2}:\\d{2}")) %>% 
+  mutate_at(vars(DATEFINISHED),
+            ~ as.POSIXct(as_datetime(.x, format = "%m/%d/%Y %H:%M")))
+
+df_asmnt_scrs_3 <- df_asmnt_scrs %>% 
+  filter(is.na(DATEFINISHED)) %>% 
+  mutate_at(vars(DATEFINISHED),
+            ~ as.POSIXct(as_datetime(.x)))
+
+# Recombine split `df_asmnt_scrs`
+whole_split_diff <- nrow(df_asmnt_scrs) - sum(nrow(df_asmnt_scrs_1), 
+                                              nrow(df_asmnt_scrs_2),
+                                              nrow(df_asmnt_scrs_3))
+if (whole_split_diff != 0) {
+  stop("Some data in `df_asmnt_scrs` unaccounted for")
+}
+df_asmnt_scrs <- bind_rows(df_asmnt_scrs_1,
+                           df_asmnt_scrs_2,
+                           df_asmnt_scrs_3)
+rm(df_asmnt_scrs_1); rm(df_asmnt_scrs_2); rm(df_asmnt_scrs_3);
+
+df_asmnt_scrs <- df_asmnt_scrs %>% 
+  mutate_at(vars(ends_with("_SCORE")),  as.numeric) %>% 
+  mutate_at(vars(ends_with("_ADJ")),    as.numeric) %>% 
+  mutate_at(vars(ends_with("_DOM")),    as.numeric) %>% 
+  mutate_at(vars(ends_with("_NONDOM")), as.numeric) %>% 
+  mutate_at(vars(ends_with("_P1")),     as.numeric) %>% 
+  mutate_at(vars(ends_with("_LOGMAR")), as.numeric) %>% 
+  mutate_at(vars(ends_with("_EAR")),    as.numeric) %>% 
+  mutate_at(vars(INSTRUMENTBREAKOFF, INSTRUMENTSTATUS2, INSTRUMENTRCREASON),
+            as.numeric)
+
+# Load `Registration Data.csv`
+df_regis_data <-
+  read_csv("./NACC_iPad_data/Registration Data.csv",
+           col_types = cols(.default = col_character()
+                            , ADCID = col_integer()
+                            , AGE = col_integer()
+                            , EDUCATION = col_integer()
+                            , GENDER = col_integer()
+                            , HANDEDNESS = col_integer()
+                            , RACE = col_integer()
+                            , ETHNICITY = col_integer()
+           )) %>% 
+  get_nonempty_fields()
+```
+
+
+## Process Data
+
+### Clean Data
+
+UDS 3
+
+MiNDSet Registry
+
+NACC iPad Toolbox
+
+```{r}
+df_asmnt_data_cln <- df_asmnt_data %>% 
+  select(-ADCID
+         , -DEVICEID
+         , -ASSESSMENTNAME
+         , -INSTORDR
+         , -INSTSCTN
+         , -ITMORDR
+         , -LOCALE
+         , -DATATYPE
+         , -APPVERSION
+         , -IPADVERSION
+         , -FIRMWAREVERSION)
+
+df_asmnt_scrs_cln <- df_asmnt_scrs %>%
+  select(-ADCID
+         , -DEVICEID
+         , -ASSESSMENTNAME
+         , -LANGUAGE
+         , -APPVERSION
+         , -IPADVERSION
+         , -FIRMWAREVERSION)
+
+df_regis_data_cln <- df_regis_data %>% 
+  select(-ADCID
+         , -DEVICEID
+         , -ASSESSMENTNAME)
+```
+
+
+### Mutate Data
+
+UDS 3
+
+MiNDSet Registry
+
+NACC iPad Toolbox
+
+```{r}
+# Create date fields from a datetime fields
+df_asmnt_data_cln_mut <- df_asmnt_data_cln %>% 
+  mutate(DATE = as_date(INSTENDED)) %>% 
+  select(-DATECREATED
+         , -INSTTARTED
+         , -INSTENDED)
+
+df_asmnt_scrs_cln_mut <- df_asmnt_scrs_cln %>% 
+  mutate(DATE = as_date(DATEFINISHED)) %>% 
+  select(-DATEFINISHED)
+
+# Propogate datetimes where missing
+df_asmnt_scrs_cln_mut <- df_asmnt_scrs_cln_mut %>% 
+  group_by(PIN) %>% 
+  mutate(DATE = case_when(
+    !is.na(DATE) ~ DATE,
+    is.na(DATE) ~ max(DATE, na.rm = TRUE)
+  )) %>% 
+  ungroup()
+```
+
+
+
+### Reshape Data
+
+NACC iPad Toolbox
+
+```{r}
+# Format from semi-long to wide
+
+# `df_asmnt_data`
+df_asmnt_data_cln_mut_lng <- df_asmnt_data_cln_mut %>% 
+  mutate_all(as.character) %>% 
+  gather(-PIN, -INST, -ITEMID, -DATE, key = "MEASURE", value = "VALUE")
+
+df_asmnt_data_cln_mut_wide <- df_asmnt_data_cln_mut_lng %>%
+  unite(col = "INST__ITEM__MEASURE", INST, ITEMID, MEASURE, sep = "__") %>%
+  spread(key = INST__ITEM__MEASURE, value = VALUE) %>% 
+  get_nonempty_fields()
+
+write_csv(df_asmnt_data_cln_mut_wide, 
+          "wide_data/df_asmnt_data_cln_mut_wide.csv",
+          na = "")
+
+# `df_asmnt_scrs`
+df_asmnt_scrs_cln_mut_lng <- df_asmnt_scrs_cln_mut %>% 
+  mutate_all(as.character) %>% 
+  gather(-PIN, -INST, -DATE, key = "MEASURE", value = "VALUE")
+
+df_asmnt_scrs_cln_mut_wid <- df_asmnt_scrs_cln_mut_lng %>% 
+  unite(col = "INST__MEASURE", INST, MEASURE, sep = "__") %>% 
+  spread(key = INST__MEASURE, value = VALUE) %>% 
+  get_nonempty_fields()
+
+write_csv(df_asmnt_scrs_cln_mut_wid,
+          "wide_data/df_asmnt_scrs_cln_mut_wid.csv",
+          na = "")
+```
+
+
+
+```{r echo=FALSE}
+###@    #==--  :  --==#    @##==---==##@##==---==##@    #==--  :  --==#    @###
+#==##@    #==-- --==#    @##==---==##@   @##==---==##@    #==-- --==#    @##==#
+#--==##@    #==-==#    @##==---==##@   #   @##==---==##@    #==-==#    @##==--#
+#=---==##@    #=#    @##==---==##@    #=#    @##==---==##@    #=#    @##==---=#
+##==---==##@   #   @##==---==##@    #==-==#    @##==---==##@   #   @##==---==##
+#@##==---==##@   @##==---==##@    #==-- --==#    @##==---==##@   @##==---==##@#
+#  @##==---==##@##==---==##@    EXTRA  :  SPACE    @##==---==##@##==---==##@  #
+#@##==---==##@   @##==---==##@    #==-- --==#    @##==---==##@   @##==---==##@#
+##==---==##@   #   @##==---==##@    #==-==#    @##==---==##@   #   @##==---==##
+#=---==##@    #=#    @##==---==##@    #=#    @##==---==##@    #=#    @##==---=#
+#--==##@    #==-==#    @##==---==##@   #   @##==---==##@    #==-==#    @##==--#
+#==##@    #==-- --==#    @##==---==##@   @##==---==##@    #==-- --==#    @##==#
+###@    #==--  :  --==#    @##==---==##@##==---==##@    #==--  :  --==#    @###
+#==##@    #==-- --==#    @##==---==##@   @##==---==##@    #==-- --==#    @##==#
+#--==##@    #==-==#    @##==---==##@   #   @##==---==##@    #==-==#    @##==--#
+#=---==##@    #=#    @##==---==##@    #=#    @##==---==##@    #=#    @##==---=#
+##==---==##@   #   @##==---==##@    #==-==#    @##==---==##@   #   @##==---==##
+#@##==---==##@   @##==---==##@    #==-- --==#    @##==---==##@   @##==---==##@#
+#  @##==---==##@##==---==##@    EXTRA  :  SPACE    @##==---==##@##==---==##@  #
+#@##==---==##@   @##==---==##@    #==-- --==#    @##==---==##@   @##==---==##@#
+##==---==##@   #   @##==---==##@    #==-==#    @##==---==##@   #   @##==---==##
+#=---==##@    #=#    @##==---==##@    #=#    @##==---==##@    #=#    @##==---=#
+#--==##@    #==-==#    @##==---==##@   #   @##==---==##@    #==-==#    @##==--#
+#==##@    #==-- --==#    @##==---==##@   @##==---==##@    #==-- --==#    @##==#
+###@    #==--  :  --==#    @##==---==##@##==---==##@    #==--  :  --==#    @###
+```
